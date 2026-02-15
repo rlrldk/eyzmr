@@ -2,12 +2,21 @@ name: Login to Majsoul
 
 on:
   schedule:
-    - cron: '5 21 * * *'  # 21:05 UTC time (6:05 a.m. Korean time)
+    - cron: '5 21 * * *'  # 21:05 UTC (한국 시간 오전 6:05)
   workflow_dispatch:
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # 한 계정이 실패해도 다른 계정은 진행
+      matrix:
+        include:
+          - account_id: "" # UID, TOKEN 사용 (JP 서버)
+            host: ""       # 기본값 사용
+          - account_id: "2" # UID2, TOKEN2 사용 (EN 서버)
+            host: "https://mahjongsoul.game.yo-star.com/"
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -25,16 +34,18 @@ jobs:
     - name: Execute main.py
       run: python main.py
       env:
-        UID: ${{ secrets.UID }}
-        TOKEN: ${{ secrets.TOKEN }}
+        # matrix.account_id가 없으면 UID/TOKEN, 있으면 UID2/TOKEN2를 자동으로 가져옵니다.
+        UID: ${{ secrets[format('UID{0}', matrix.account_id)] }}
+        TOKEN: ${{ secrets[format('TOKEN{0}', matrix.account_id)] }}
+        MS_HOST: ${{ matrix.host }}
 
     - name: Update Keep-Alive File
       run: |
-        echo "Last run: $(date)" > keep_alive.txt
+        echo "Last run (Account ${{ matrix.account_id || '1' }}): $(date)" > keep_alive.txt
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git add keep_alive.txt
-        git commit -m "Keep-alive: Update timestamp"
-        git push
+        git commit -m "Keep-alive: Update timestamp for account ${{ matrix.account_id || '1' }}" || exit 0
+        git push || exit 0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
