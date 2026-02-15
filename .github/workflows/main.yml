@@ -6,46 +6,37 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-script:
+  # 1. 일본 서버 (기본 설정 사용)
+  login-jp:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        server: [JP, EN]
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Execute main.py
+        run: python main.py
+        env:
+          UID: ${{ secrets.UID }}
+          TOKEN: ${{ secrets.TOKEN }}
+          # JP는 기본 서버이므로 MS_HOST를 넣지 않습니다.
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.11'
-
-    - name: Install dependencies
-      run: pip install -r requirements.txt
-
-    - name: Execute main.py
-      run: python main.py
-      env:
-        # 서버별로 UID와 TOKEN을 확실히 매칭
-        UID: ${{ matrix.server == 'JP' && secrets.UID || secrets.UID2 }}
-        TOKEN: ${{ matrix.server == 'JP' && secrets.TOKEN || secrets.TOKEN2 }}
-        # 글로벌 서버일 때만 호스트 주소 강제 주입
-        MS_HOST: ${{ matrix.server == 'EN' && 'https://mahjongsoul.game.yo-star.com/' || '' }}
-
-    - name: Update Keep-Alive File
-      if: success() || failure() # 로그인 실패해도 잔디는 심도록 설정
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        
-        # 다른 서버 작업과 푸시가 겹쳐서 충돌나는 것 방지
-        git pull --rebase origin main
-        
-        echo "Last run (${{ matrix.server }}): $(date)" > keep_alive_${{ matrix.server }}.txt
-        git add keep_alive_${{ matrix.server }}.txt
-        git commit -m "Keep-alive: ${{ matrix.server }} updated" || exit 0
-        git push origin main
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # 2. 글로벌 서버 (MS_HOST 추가)
+  login-en:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Execute main.py
+        run: python main.py
+        env:
+          UID: ${{ secrets.UID2 }}
+          TOKEN: ${{ secrets.TOKEN2 }}
+          # 말씀하신 대로 EN 서버 주소를 여기에 바로 넣었습니다.
+          MS_HOST: "https://mahjongsoul.game.yo-star.com/"
